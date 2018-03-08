@@ -1,0 +1,373 @@
+<!doctype html>
+<html>
+	<head>
+		<meta charset="UTF-8">
+		<meta name="viewport" content="width=device-width" />
+		<title>ThreeJS</title>
+		<link rel="stylesheet" href="style.css" />
+		<script src="http://ajax.googleapis.com/ajax/libs/jquery/1.11.2/jquery.min.js" ></script>
+		<script src="http://cdnjs.cloudflare.com/ajax/libs/three.js/r71/three.min.js"></script>
+		<script src="script.js"></script>
+	</head>
+	<body style="margin: 0;">
+		<h1 id="debug" style="position:absolute; color: white; top: 0; left:0;z-index:1000">ThreeJS</h1>
+		<div id="test"></div>
+		<rinput id="controls" type="text" value="" style="height:50px; position:absolute; z-index:1000" />
+
+		<style>
+			.portrait {
+				-webkit-transform: rotate(90deg);
+				-webkit-transform-origin: 200px 190px;
+			}
+			.portrait-onready {
+				-webkit-transform: rotate(90deg);
+				-webkit-transform-origin: 165px 150px;
+			}
+		</style>
+		<script>
+			$(window).scrollTo(0, 1);
+			$(window).bind('orientationchange', function(e, onready) {
+				if (onready) {
+					$(document.body).addClass('portrait-onready');
+				}
+				if (Math.abs(window.orientation) != 90) {
+					$(document.body).addClass('portrait');
+				} else {
+					$(document.body).removeClass('portrait').removeClass('portrait-onready');
+				}
+			});
+			$(window).trigger('orientationchange', true);
+			// fire the orientation change event at the start, to make sure
+		</script>
+		<script>
+			var agent = navigator.userAgent.toLowerCase();
+			// We need to eliminate Symbian, Series 60, Windows Mobile and Blackberry
+			// browsers for this quick and dirty check. This can be done with the user agent.
+			var otherBrowser = (agent.indexOf("series60") != -1) || (agent.indexOf("symbian") != -1) || (agent.indexOf("windows ce") != -1) || (agent.indexOf("blackberry") != -1);
+			// If the screen orientation is defined we are in a modern mobile OS
+			var mobileOS = typeof orientation != 'undefined' ? true : false;
+			// If touch events are defined we are in a modern touch screen OS
+			var touchOS = ('ontouchstart' in document.documentElement) ? true : false;
+			// iPhone and iPad can be reliably identified with the navigator.platform
+			// string, which is currently only available on these devices.
+			var iOS = (navigator.platform.indexOf("iPhone") != -1) || (navigator.platform.indexOf("iPad") != -1) ? true : false;
+			// If the user agent string contains "android" then it's Android. If it
+			// doesn't but it's not another browser, not an iOS device and we're in
+			// a mobile and touch OS then we can be 99% certain that it's Android.
+			var android = (agent.indexOf("android") != -1) || (!iOS && !otherBrowser && touchOS && mobileOS) ? true : false;
+
+			var width = window.innerWidth;
+			var height = Math.floor(width / 2);
+			//window.innerHeight;
+
+			var renderer = new THREE.WebGLRenderer({
+				antialias : true
+			});
+
+			renderer.setSize(width, height);
+			document.body.appendChild(renderer.domElement);
+
+			var scene = new THREE.Scene;
+
+			var cubeGeometry = new THREE.CubeGeometry(100, 100, 100);
+			var cubeMaterial = new THREE.MeshLambertMaterial({
+				color : 0x1ec876
+			});
+			var cube = new THREE.Mesh(cubeGeometry, cubeMaterial);
+			cube.rotation.y = Math.PI * 45 / 180;
+			scene.add(cube);
+
+			separation = 10;
+
+			var cameraLeft = new THREE.PerspectiveCamera(45, width / 2, 0.1, 10000);
+			cameraLeft.position.set(-separation, 0, 180);
+			cameraLeft.useQuaternion = true;
+			scene.add(cameraLeft);
+
+			var cameraRight = new THREE.PerspectiveCamera(45, width / 2, 0.1, 10000);
+			cameraRight.position.set(separation, 0, 180);
+			cameraRight.useQuaternion = true;
+			scene.add(cameraRight);
+
+			width = Math.round(width / 2);
+
+			var skyboxGeometry = new THREE.SphereGeometry(2000, 32, 32);
+			//new THREE.CubeGeometry(10000, 10000, 10000);
+
+			var skyboxMaterial = new THREE.MeshBasicMaterial({
+				side : THREE.BackSide,
+				map : THREE.ImageUtils.loadTexture('theater360.jpg')
+			});
+			var skybox = new THREE.Mesh(skyboxGeometry, skyboxMaterial);
+			skybox.rotation.y = Math.PI * 45 / 180;
+			scene.add(skybox);
+
+			var pointLight = new THREE.PointLight(0xffffff);
+			pointLight.position.set(0, 300, 200);
+			scene.add(pointLight);
+
+			var clock = new THREE.Clock;
+
+			var tabletMode = height < width;
+
+			var inputMotionValues = {
+				alpha : 0,
+				beta : 0,
+				gamma : 0
+			};
+			var outputMotionValues;
+
+			var degtorad = Math.PI / 180;
+			// Degree-to-Radian conversion
+			var compassHeading = function(alpha, beta, gamma) {
+				alpha = Math.abs(alpha);
+				beta = Math.abs(beta);
+				gamma = Math.abs(gamma);
+
+				var _x = beta ? beta * degtorad : 0;
+				// beta value
+				var _y = gamma ? gamma * degtorad : 0;
+				// gamma value
+				var _z = alpha ? alpha * degtorad : 0;
+				// alpha value
+
+				var cX = Math.cos(_x);
+				var cY = Math.cos(_y);
+				var cZ = Math.cos(_z);
+				var sX = Math.sin(_x);
+				var sY = Math.sin(_y);
+				var sZ = Math.sin(_z);
+
+				// Calculate Vx and Vy components
+				var Vx = -cZ * sY - sZ * sX * cY;
+				var Vy = -sZ * sY + cZ * sX * cY;
+
+				// Calculate compass heading
+				var compassHeading = Math.atan(Vx / Vy);
+
+				// Convert compass heading to use whole unit circle
+				if (Vy < 0) {
+					compassHeading += Math.PI;
+				} else if (Vx < 0) {
+					compassHeading += 2 * Math.PI;
+				}
+
+				return compassHeading * (180 / Math.PI );
+				// Compass Heading (in degrees)
+
+			};
+			
+			// The above method filters the input values and applies LPF and outputs the filtered signals.
+			var cutOff = 1;
+			// if ALPHA = 1 OR 0, no filter applies.
+			var lowPass = function(inputVals, outputVals) {
+				var i;
+
+				if (!outputVals)
+					return inputVals;
+
+				for (i in inputVals) {
+					outputVals[i] = outputVals[i] + cutOff * (inputVals[i] - outputVals[i]);
+				}
+
+				return outputVals;
+			};
+
+			var prevDeviceOrientation, deviceOrientation;
+
+			// Create a constant to convert nanoseconds to seconds.
+			var NS2S = 1.0 / 1000.00;
+			var deltaRotationVector;
+			// = [];
+			var deviceOrientationVector;
+
+			var isStraight;
+			var rotationRate;
+			var motionHandler = function(e) {
+				var gravity = Math.abs(e.accelerationIncludingGravity.x);
+				isStraight = gravity < 9.9 && gravity > 9.8;
+				rotationRate = e.rotationRate;
+				updateCameraPosition(e.interval);
+			};
+
+			var alphaCount = 0, alphaAvg = 0, hitCount = 0;
+			var avgMotionChange = {
+				alpha : {
+					total : 0,
+					avg : 0
+				},
+				beta : {
+					total : 0,
+					avg : 0
+				},
+				gamma : {
+					total : 0,
+					avg : 0
+				}
+			};
+
+			var getTotalsforAxes = function(axis, newVal, totalCnt) {
+				axis.total += newVal;
+				axis.avg = axis.total / totalCnt;
+			};
+			var updateCameraPosition = function(timeDelta) {
+				hitCount++;
+				getTotalsforAxes(avgMotionChange.alpha, rotationRate.alpha, hitCount);
+				getTotalsforAxes(avgMotionChange.beta, rotationRate.beta, hitCount);
+				getTotalsforAxes(avgMotionChange.gamma, rotationRate.gamma, hitCount);
+
+				//hitCount > 1000 && alert(alphaAvg);
+				//document.getElementById("debug").innerHTML = alphaAvg;
+
+				var dT, axisX, axisY, axisZ, omegaMagnitude, EPSILON = 1;
+
+				var thetaOverTwo, sinThetaOverTwo, cosThetaOverTwo;
+
+				var deltaRotationMatrix;
+
+				// This timestep's delta rotation to be multiplied by the current rotation
+				// after computing it from the gyro sample data.
+
+				var roundDown = function(num) {
+					return Math.floor(num * 1000) / 1000;
+				};
+
+				if (true) {
+					dT = timeDelta * NS2S;
+
+					inputMotionValues.alpha = isStraight ? 0 : (rotationRate.alpha - avgMotionChange.alpha.avg);
+					//0.00018); //(Math.abs(rotationRate.alpha) > 0.7 ? ((rotationRate.alpha > 0 ? 1:-1)*0.7) : rotationRate.alpha) + 0.05;
+					//inputMotionValues.alpha *= 2;
+					inputMotionValues.beta = rotationRate.beta - avgMotionChange.beta.avg;
+					//Math.abs(rotationRate.beta) < 0.2 ? 0 : -1*rotationRate.beta;
+					inputMotionValues.gamma = (rotationRate.gamma - avgMotionChange.gamma.avg) * 2.25;
+					//Math.abs(rotationRate.gamma) < 0.2 ? 0 : rotationRate.gamma;
+
+					outputMotionValues = inputMotionValues;
+					//lowPass(inputMotionValues, outputMotionValues);
+
+					// Axis of the rotation sample, not normalized yet.
+					axisX = -1 * outputMotionValues.beta;
+					axisZ = outputMotionValues.gamma;
+					axisY = outputMotionValues.alpha;
+
+					// Calculate the angular speed of the sample
+					omegaMagnitude = Math.sqrt(axisX * axisX + axisY * axisY + axisZ * axisZ);
+
+					// Integrate around this axis with the angular speed by the timestep
+					// in order to get a delta rotation from this sample over the timestep
+					// We will convert this axis-angle representation of the delta rotation
+					// into a quaternion before turning it into the rotation matrix.
+					thetaOverTwo = omegaMagnitude * dT / 2.00;
+
+					deltaRotationVector = new THREE.Vector3(axisX, axisY, axisZ);
+
+					deviceOrientationVector = new THREE.Vector3(deviceOrientation.beta, deviceOrientation.alpha, deviceOrientation.gamma);
+
+					// Normalize the rotation vector if it's big enough to get the axis
+					// (that is, EPSILON should represent your maximum allowable margin of error)
+					if (omegaMagnitude > EPSILON) {
+
+						deltaRotationVector.normalize();
+					}
+
+					quaternion = new THREE.Quaternion().setFromAxisAngle(deltaRotationVector, thetaOverTwo);
+				}
+
+				curQuaternion = cameraLeft.quaternion;
+				curQuaternion.multiplyQuaternions(quaternion, curQuaternion);
+				curQuaternion.normalize();
+				cameraLeft.setRotationFromQuaternion(curQuaternion);
+
+				curQuaternion = cameraRight.quaternion;
+				curQuaternion.multiplyQuaternions(quaternion, curQuaternion);
+				curQuaternion.normalize();
+				cameraRight.setRotationFromQuaternion(curQuaternion);
+
+				var normalizeAxis = function(rotationAxis) {
+					return rotationAxis + (rotationAxis > 0 ? -1 : 1) * 0.005;
+				};
+
+				var normalizeCamera = function(camera) {
+					camera.rotation.z = isStraight && Math.abs(camera.rotation.z) > 0.005 ? normalizeAxis(camera.rotation.z) : camera.rotation.z;
+					camera.rotation.x = isStraight && Math.abs(camera.rotation.x) > 0.005 ? normalizeAxis(camera.rotation.x) : camera.rotation.x;
+				};
+
+				normalizeCamera(cameraLeft);
+				normalizeCamera(cameraRight);
+
+			};
+
+			var positionHandler = function(e) {
+				switch(e.keyCode) {
+					case 38:
+						//up
+						cameraLeft.position.z -= 10;
+						cameraRight.position.z -= 10;
+						break;
+					case 40:
+						//down
+						cameraLeft.position.z += 10;
+						cameraRight.position.z += 10;
+						break;
+				}
+			};
+
+			var alpha = 0;
+			prevDeviceOrientation = {
+				alpha : 0,
+				beta : 0,
+				gamma : 0
+			};
+			var deviceOrientationHandler = function(e) {
+				alpha = Math.floor(e.alpha + 0.8 * (alpha - e.alpha)) - 2;
+				prevDeviceOrientation = deviceOrientation;
+				deviceOrientation = {
+					alpha : alpha,
+					beta : e.beta,
+					gamma : e.gamma
+				};
+			};
+
+			window.addEventListener('deviceorientation', deviceOrientationHandler, false);
+			window.addEventListener('devicemotion', motionHandler);
+			document.addEventListener('keypress', positionHandler);
+
+			var delta = 0;
+			function render() {
+				/*
+				if(rotationRate){
+				updateCameraPosition(delta);
+				}
+				*/
+				// Render the scene
+				renderer.setViewport(0, 0, width, height);
+				renderer.setScissor(0, 0, width, height);
+				renderer.enableScissorTest(true);
+
+				cameraLeft.aspect = width * 2 / height;
+				cameraLeft.updateProjectionMatrix();
+
+				renderer.render(scene, cameraLeft);
+
+				renderer.setViewport(width, 0, width, height);
+				renderer.setScissor(width, 0, width, height);
+				renderer.enableScissorTest(true);
+
+				cameraRight.aspect = width * 2 / height;
+				cameraRight.updateProjectionMatrix();
+
+				renderer.render(scene, cameraRight);
+
+				delta = clock.getDelta();
+
+				cube.rotation.y -= delta;
+				//skybox.rotation.y += delta/20;
+
+				requestAnimationFrame(render);
+			}
+
+			render();
+		</script>
+	</body>
+</html>
