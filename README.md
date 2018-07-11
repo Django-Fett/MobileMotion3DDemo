@@ -1,2 +1,5 @@
 # MobileMotion3DDemo
-VR POC: ThreeJS Demo with IOS motion tracking
+VR POC: (Abandoned - doing VR Project in C#/Unity Now)
+
+ThreeJS Demo with IOS motion tracking
+
